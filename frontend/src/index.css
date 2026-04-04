@@ -1,0 +1,39 @@
+/* stylelint: allow Tailwind directives */
+/* stylelint-disable at-rule-no-unknown */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  font-family: "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* standard property alongside webkit for compatibility/linting */
+  line-clamp: 2;
+}
+
+/* Accessibility & compatibility tweaks */
+html, body {
+  /* Prefer the standard property, then vendor-prefixed for older WebKit/Safari
+     Note: browsers support varies; this provides broad coverage */
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+}
+
+/* Ensure backdrop-filter works in Safari with vendor prefix where Tailwind uses .backdrop-blur-md */
+.backdrop-blur-md {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
