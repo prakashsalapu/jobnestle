@@ -5,116 +5,119 @@ const generateOtp = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Pure function - returns object instead of sending response
+// ================= SEND OTP =================
 const sendOtp = async (email) => {
   try {
     console.log(`📍 OTP Send: Generating OTP for ${email}`);
-    
-    const existingOtp = await Otp.findOne({ email: email.toLowerCase() });
-    
+
+    const normalizedEmail = email.toLowerCase();
+
+    const existingOtp = await Otp.findOne({ email: normalizedEmail });
+
+    // ⏱️ Cooldown check
     if (existingOtp && existingOtp.lastSentAt) {
-      const timeSinceLastSend = Date.now() - new Date(existingOtp.lastSentAt).getTime();
-      const cooldownMs = 60000; // 60 seconds
-      
+      const timeSinceLastSend =
+        Date.now() - new Date(existingOtp.lastSentAt).getTime();
+
+      const cooldownMs = 60000;
+
       if (timeSinceLastSend < cooldownMs) {
-        const waitSeconds = Math.ceil((cooldownMs - timeSinceLastSend) / 1000);
-        console.log(`⚠️ OTP Cooldown: Please wait ${waitSeconds} seconds`);
+        const waitSeconds = Math.ceil(
+          (cooldownMs - timeSinceLastSend) / 1000
+        );
+
         return {
           success: false,
-          message: `Please wait ${waitSeconds} seconds before requesting a new OTP`
+          message: `Please wait ${waitSeconds} seconds before requesting a new OTP`,
         };
       }
     }
 
     const otp = generateOtp();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
     const now = new Date();
 
-    const otpRecord = await Otp.findOneAndUpdate(
-      { email: email.toLowerCase() },
+    await Otp.findOneAndUpdate(
+      { email: normalizedEmail },
       { otp, expiresAt, attempts: 0, lastSentAt: now },
       { upsert: true, new: true }
     );
 
-    console.log(`✅ OTP generated and stored: ${otpRecord._id}`);
+    console.log(`✅ OTP generated for ${email}`);
 
-    try {
-      await sendOtpEmail(email, otp);
-      console.log(`✅ OTP email sent to ${email}`);
-    } catch (emailError) {
-      console.error(`⚠️ Email service error: ${emailError.message}`);
-      console.log(`📧 DEMO MODE - OTP for ${email}: ${otp}`);
-    }
+    // ✅ NON-BLOCKING EMAIL (SAFE)
+    setImmediate(async () => {
+      try {
+        await sendOtpEmail(email, otp);
+        console.log(`📧 OTP email sent to ${email}`);
+      } catch (err) {
+        console.error(`❌ Email failed: ${err.message}`);
+        console.log(`📧 DEMO OTP for ${email}: ${otp}`);
+      }
+    });
 
+    // ✅ RETURN IMMEDIATELY (NO WAIT)
     return {
       success: true,
-      message: 'OTP sent successfully'
+      message: 'OTP sent successfully',
     };
   } catch (err) {
     console.error('❌ OTP send error:', err.message);
     return {
       success: false,
-      message: 'Failed to send OTP'
+      message: 'Failed to send OTP',
     };
   }
 };
 
-// Pure function - returns object instead of sending response
+// ================= VERIFY OTP =================
 const verifyOtp = async (email, otp) => {
   try {
-    console.log(`📍 OTP Verify: Verifying OTP for ${email}`);
-    
-    const otpRecord = await Otp.findOne({ email: email.toLowerCase() });
+    console.log(`📍 OTP Verify: ${email}`);
+
+    const normalizedEmail = email.toLowerCase();
+
+    const otpRecord = await Otp.findOne({ email: normalizedEmail });
 
     if (!otpRecord) {
-      console.warn('❌ OTP Verify: OTP not found');
-      return {
-        success: false,
-        message: 'OTP not found or expired'
-      };
+      return { success: false, message: 'OTP not found or expired' };
     }
 
     if (new Date() > otpRecord.expiresAt) {
-      console.warn('❌ OTP Verify: OTP expired');
-      await Otp.deleteOne({ email: email.toLowerCase() });
+      await Otp.deleteOne({ email: normalizedEmail });
       return {
         success: false,
-        message: 'OTP has expired. Please request a new one'
+        message: 'OTP has expired. Please request a new one',
       };
     }
 
     if (otpRecord.attempts >= 5) {
-      console.warn('❌ OTP Verify: Maximum attempts exceeded');
-      await Otp.deleteOne({ email: email.toLowerCase() });
+      await Otp.deleteOne({ email: normalizedEmail });
       return {
         success: false,
-        message: 'Maximum OTP attempts exceeded. Request a new OTP'
+        message: 'Maximum OTP attempts exceeded. Request a new OTP',
       };
     }
 
     if (otpRecord.otp !== otp) {
       otpRecord.attempts += 1;
       await otpRecord.save();
-      console.warn(`❌ OTP Verify: OTP mismatch. Attempt ${otpRecord.attempts}/5`);
+
       return {
         success: false,
-        message: `Invalid OTP. ${5 - otpRecord.attempts} attempts remaining`
+        message: `Invalid OTP. ${5 - otpRecord.attempts} attempts remaining`,
       };
     }
 
-    console.log('✅ OTP Verify: OTP verified successfully');
-    await Otp.deleteOne({ email: email.toLowerCase() });
+    await Otp.deleteOne({ email: normalizedEmail });
 
     return {
       success: true,
-      message: 'OTP verified successfully'
+      message: 'OTP verified successfully',
     };
   } catch (err) {
     console.error('❌ OTP verify error:', err.message);
-    return {
-      success: false,
-      message: 'Server error'
-    };
+    return { success: false, message: 'Server error' };
   }
 };
 
@@ -123,3 +126,4 @@ module.exports = {
   sendOtp,
   verifyOtp,
 };
+
