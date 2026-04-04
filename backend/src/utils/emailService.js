@@ -16,7 +16,7 @@ const initializeEmailService = () => {
   );
 
   if (!EMAIL_USER || !EMAIL_PASS) {
-    console.warn("⚠️ Email credentials missing → running in DEMO MODE");
+    console.warn("⚠️ Email credentials missing → DEMO MODE");
     emailConfigured = false;
     return;
   }
@@ -28,6 +28,9 @@ const initializeEmailService = () => {
         user: EMAIL_USER,
         pass: EMAIL_PASS,
       },
+      connectionTimeout: 5000, // ⏱️ prevent hanging
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
     });
 
     emailConfigured = true;
@@ -43,16 +46,14 @@ initializeEmailService();
 
 // ================= SEND OTP EMAIL =================
 const sendOtpEmail = async (email, otp) => {
-  // Always log OTP (dev-friendly)
-  console.log(`\n${"=".repeat(60)}`);
+  console.log(`\n${"=".repeat(50)}`);
   console.log(`📧 OTP for: ${email}`);
   console.log(`🔐 Code: ${otp}`);
-  console.log(`⏱️ Expires in: 5 minutes`);
-  console.log(`${"=".repeat(60)}\n`);
+  console.log(`${"=".repeat(50)}\n`);
 
-  // Demo mode fallback
+  // Demo mode
   if (!emailConfigured) {
-    console.warn("⚠️ Email not configured → OTP shown in console only");
+    console.warn("⚠️ Email not configured → console OTP only");
     return { ok: true, mode: "demo" };
   }
 
@@ -60,47 +61,31 @@ const sendOtpEmail = async (email, otp) => {
     from: `"JobNestle" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: "🔐 Your JobNestle OTP Code",
-    text: `Your JobNestle OTP is ${otp}. It expires in 5 minutes.`,
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-        <h2 style="color: #4f46e5;">JobNestle</h2>
-        
-        <p>Hello,</p>
-        
-        <p>Your One-Time Password (OTP) is:</p>
-        
-        <h1 style="letter-spacing: 6px; color: #111;">${otp}</h1>
-        
-        <p>This OTP is valid for <b>5 minutes</b>.</p>
-        
-        <p style="margin-top: 20px;">
-          If you did not request this, please ignore this email.
-        </p>
-        
-        <hr style="margin: 20px 0;" />
-        
-        <p style="font-size: 12px; color: #777;">
-          This is an automated message from JobNestle. Do not reply.
-        </p>
-      </div>
-    `,
+    text: `Your OTP is ${otp}`,
   };
 
   try {
-    const result = await transporter.sendMail(mailOptions);
-    console.log(`✅ OTP email sent to ${email}`);
+    // ✅ Add timeout protection
+    const result = await Promise.race([
+      transporter.sendMail(mailOptions),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Email timeout")), 5000)
+      ),
+    ]);
+
+    console.log(`✅ Email sent to ${email}`);
     return { ok: true, mode: "email", result };
   } catch (error) {
-    console.error(`❌ Email failed → ${error.message}`);
+    console.error(`❌ Email failed: ${error.message}`);
 
-    // Fallback (important for dev)
-    console.log(`\n${"=".repeat(60)}`);
-    console.log(`📧 FALLBACK MODE`);
-    console.log(`🔐 OTP for ${email}: ${otp}`);
-    console.log(`${"=".repeat(60)}\n`);
+    // ✅ fallback (VERY IMPORTANT)
+    console.log(`\n${"=".repeat(50)}`);
+    console.log(`📧 FALLBACK OTP for ${email}: ${otp}`);
+    console.log(`${"=".repeat(50)}\n`);
 
     return { ok: true, mode: "fallback" };
   }
 };
 
 module.exports = { sendOtpEmail };
+
