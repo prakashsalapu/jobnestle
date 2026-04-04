@@ -52,4 +52,4 @@ jobnestle/
 - v1.0 – Initial MERN app
 - v1.1 – Simplified auth + improved UI
 - v2.0 – (Upcoming) Java backend
->>>>>>> 29f7d8a (Simplified system to single user, improved auth flow (OTP + Google), UI enhancements)
+
